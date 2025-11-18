@@ -8,8 +8,6 @@ public class TestBase
 {
     protected Person TestPerson { get; private set; }
     protected Person PersonWithCyclicReference { get; private set; }
-    protected Employee TestEmployee { get; private set; }
-    protected Company TestCompany { get; private set; }
 
     [OneTimeSetUp]
     public virtual void SetUp()
@@ -27,20 +25,6 @@ public class TestBase
         var child = new Person { Name = "Child", Parent = parent };
         parent.Children.Add(child);
         PersonWithCyclicReference = parent;
-
-        TestEmployee = new Employee
-        {
-            Name = "Jane",
-            Age = 25,
-            Position = "Developer",
-            Salary = 50000.50m
-        };
-
-        TestCompany = new Company
-        {
-            Name = "Test Corp",
-            CEO = new Employee { Name = "CEO", Age = 45 }
-        };
     }
 
     protected List<Person> CreateTestPeopleList() => new()

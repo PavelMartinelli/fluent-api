@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace ObjectPrinting.Tests;
 
 [TestFixture]
-public class ObjectPrinterCollectionSerializationTests : TestBase
+public class CollectionSerializationTests : TestBase
 {
     [Test]
     public void PrintToString_WithList_SerializesListElements()

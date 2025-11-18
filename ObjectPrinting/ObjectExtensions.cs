@@ -4,13 +4,13 @@ namespace ObjectPrinting;
 
 public static class ObjectPrinterExtensions
 {
-    public static string PrintToString<T>(this T obj)
+    public static string PrintToString<T>(this T obj, int? nestingLevel = null)
     {
-        return ObjectPrinter.For<T>().PrintToString(obj);
+        return ObjectPrinter.For<T>().PrintToString(obj, nestingLevel);
     }
     
-    public static string PrintToString<T>(this T obj, Func<PrintingConfig<T>, PrintingConfig<T>> config)
+    public static string PrintToString<T>(this T obj, Func<PrintingConfig<T>, PrintingConfig<T>> configurator, int? nestingLevel = null)
     {
-        return config(ObjectPrinter.For<T>()).PrintToString(obj);
+        return configurator(ObjectPrinter.For<T>()).PrintToString(obj, nestingLevel);
     }
 }

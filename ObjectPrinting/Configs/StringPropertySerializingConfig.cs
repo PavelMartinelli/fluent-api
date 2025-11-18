@@ -7,7 +7,6 @@ public class StringPropertySerializingConfig<TOwner> : PropertySerializingConfig
 
     public PrintingConfig<TOwner> TrimTo(int maxLength)
     {
-        printingConfig.AddPropertyTrim(propertyName, maxLength);
-        return printingConfig;
+        return printingConfig.AddPropertyTrim(propertyName, maxLength);
     }
 }

@@ -11,18 +11,77 @@ namespace ObjectPrinting;
 
 public class PrintingConfig<TOwner>
 {
-    private readonly Dictionary<Type, Delegate> typeSerializers = new();
-    private readonly Dictionary<Type, CultureInfo> typeCultures = new();
-    private readonly Dictionary<string, Delegate> propertySerializers = new();
-    private readonly Dictionary<string, int> propertyTrimLengths = new();
-    private readonly HashSet<string> excludedProperties = [];
-    private readonly HashSet<Type> excludedTypes = [];
+    private readonly Dictionary<Type, Delegate> typeSerializers;
+    private readonly Dictionary<Type, CultureInfo> typeCultures;
+    private readonly Dictionary<string, Delegate> propertySerializers;
+    private readonly Dictionary<string, int> propertyTrimLengths;
+    private readonly HashSet<string> excludedProperties;
+    private readonly HashSet<Type> excludedTypes;
     private readonly HashSet<object> visitedObjects = [];
+    
+    private readonly Type[] finalTypes =
+    [
+        typeof(int), typeof(double), typeof(float), typeof(string),
+        typeof(DateTime), typeof(TimeSpan), typeof(Guid), typeof(decimal),
+        typeof(long), typeof(short), typeof(byte), typeof(bool),
+        typeof(char), typeof(sbyte), typeof(ushort), typeof(uint),
+        typeof(ulong)
+    ];
+    
+    private int nestingLevel;
+    
+    public PrintingConfig()
+    {
+        typeSerializers = new Dictionary<Type, Delegate>();
+        typeCultures = new Dictionary<Type, CultureInfo>();
+        propertySerializers = new Dictionary<string, Delegate>();
+        propertyTrimLengths = new Dictionary<string, int>();
+        excludedProperties = [];
+        excludedTypes = [];
+        nestingLevel = 50;
+    }
+    
+    private PrintingConfig(
+        Dictionary<Type, Delegate> typeSerializers,
+        Dictionary<Type, CultureInfo> typeCultures,
+        Dictionary<string, Delegate> propertySerializers,
+        Dictionary<string, int> propertyTrimLengths,
+        HashSet<string> excludedProperties,
+        HashSet<Type> excludedTypes,
+        int maxNestingLevel)
+    {
+        this.typeSerializers = new Dictionary<Type, Delegate>(typeSerializers);
+        this.typeCultures = new Dictionary<Type, CultureInfo>(typeCultures);
+        this.propertySerializers = new Dictionary<string, Delegate>(propertySerializers);
+        this.propertyTrimLengths = new Dictionary<string, int>(propertyTrimLengths);
+        this.excludedProperties = new HashSet<string>(excludedProperties);
+        this.excludedTypes = new HashSet<Type>(excludedTypes);
+        this.nestingLevel = maxNestingLevel;
+    }
+    
+    private PrintingConfig<TOwner> PrintingConfigWith(
+        Dictionary<Type, Delegate> typeSerializers = null,
+        Dictionary<Type, CultureInfo> typeCultures = null,
+        Dictionary<string, Delegate> propertySerializers = null,
+        Dictionary<string, int> propertyTrimLengths = null,
+        HashSet<string> excludedProperties = null,
+        HashSet<Type> excludedTypes = null,
+        int? maxNestingLevel = null)
+    {
+        return new PrintingConfig<TOwner>(
+            typeSerializers ?? this.typeSerializers,
+            typeCultures ?? this.typeCultures,
+            propertySerializers ?? this.propertySerializers,
+            propertyTrimLengths ?? this.propertyTrimLengths,
+            excludedProperties ?? this.excludedProperties,
+            excludedTypes ?? this.excludedTypes,
+            maxNestingLevel ?? this.nestingLevel);
+    }
 
     public PrintingConfig<TOwner> ExcludeType<T>()
     {
-        excludedTypes.Add(typeof(T));
-        return this;
+        var newExcludedTypes = new HashSet<Type>(excludedTypes) { typeof(T) };
+        return PrintingConfigWith(excludedTypes: newExcludedTypes);
     }
 
     public TypeSerializingConfig<TOwner, T> SerializeType<T>()
@@ -34,8 +93,7 @@ public class PrintingConfig<TOwner>
         Expression<Func<TOwner, TProp>> propertySelector)
     {
         var propertyName = GetPropertyName(propertySelector);
-        return new PropertySerializingConfig<TOwner, TProp>(this,
-            propertyName);
+        return new PropertySerializingConfig<TOwner, TProp>(this, propertyName);
     }
 
     public StringPropertySerializingConfig<TOwner> SerializeProperty(
@@ -49,20 +107,27 @@ public class PrintingConfig<TOwner>
         Expression<Func<TOwner, TProp>> propertySelector)
     {
         var propertyName = GetPropertyName(propertySelector);
-        excludedProperties.Add(propertyName);
-        return this;
+        var newExcludedProperties = new HashSet<string>(excludedProperties) { propertyName };
+        return PrintingConfigWith(excludedProperties: newExcludedProperties);
     }
 
-    public string PrintToString(TOwner obj)
+    public string PrintToString(TOwner obj, int? nestingLevel = null)
     {
+        if (nestingLevel < 0)
+            throw new ArgumentException("Nesting level cannot be negative");
+        this.nestingLevel = nestingLevel ?? this.nestingLevel;
+        
         visitedObjects.Clear();
-        return PrintToString(obj, 0);
+        return PrintToStringInternal(obj, 0);
     }
 
-    private string PrintToString(object obj, int nestingLevel)
+    private string PrintToStringInternal(object obj, int currentnestingLevel)
     {
         if (obj == null)
             return "null" + Environment.NewLine;
+        
+        if (currentnestingLevel >= this.nestingLevel)
+            return $"Max nesting level ({this.nestingLevel}) reached" + Environment.NewLine;
 
         var type = obj.GetType();
 
@@ -77,9 +142,9 @@ public class PrintingConfig<TOwner>
                 return SerializeValue(obj, type, null) + Environment.NewLine;
             
             if (obj is IEnumerable enumerable && !(obj is string))
-                return SerializeCollection(enumerable, nestingLevel);
+                return SerializeCollection(enumerable, currentnestingLevel);
 
-            return SerializeObject(obj, nestingLevel, type);
+            return SerializeObject(obj, currentnestingLevel, type);
         }
         finally
         {
@@ -87,8 +152,7 @@ public class PrintingConfig<TOwner>
         }
     }
 
-    private string SerializeCollection(IEnumerable collection,
-        int nestingLevel)
+    private string SerializeCollection(IEnumerable collection, int nestingLevel)
     {
         var indentation = new string('\t', nestingLevel + 1);
         var sb = new StringBuilder();
@@ -148,12 +212,12 @@ public class PrintingConfig<TOwner>
             if (propertyInfo.GetIndexParameters().Length > 0)
                 continue;
 
-            if (ShouldExcludeMember(propertyInfo.PropertyType,
-                    propertyInfo.Name))
+            if (ShouldExcludeMember(propertyInfo.PropertyType, propertyInfo.Name))
                 continue;
 
             var value = propertyInfo.GetValue(obj);
-            var serializedValue = SerializeValue(value, propertyInfo.PropertyType, propertyInfo.Name, nestingLevel);
+            var serializedValue = SerializeValue(value, propertyInfo.PropertyType, 
+                propertyInfo.Name, nestingLevel);
             sb.Append(indentation + propertyInfo.Name + " = " + serializedValue);
         }
 
@@ -205,7 +269,7 @@ public class PrintingConfig<TOwner>
         }
 
         if (!IsFinalType(valueType))
-            return PrintToString(value, nestingLevel + 1);
+            return PrintToStringInternal(value, nestingLevel + 1);
         
         if (value is IFormattable formattableDefault)
             return formattableDefault.ToString(null, CultureInfo.InvariantCulture) + Environment.NewLine;
@@ -235,19 +299,7 @@ public class PrintingConfig<TOwner>
         return excludedTypes.Contains(memberType) || excludedProperties.Contains(memberName);
     }
 
-    private bool IsFinalType(Type type)
-    {
-        var finalTypes = new[]
-        {
-            typeof(int), typeof(double), typeof(float), typeof(string),
-            typeof(DateTime), typeof(TimeSpan), typeof(Guid), typeof(decimal),
-            typeof(long), typeof(short), typeof(byte), typeof(bool),
-            typeof(char), typeof(sbyte), typeof(ushort), typeof(uint),
-            typeof(ulong)
-        };
-
-        return finalTypes.Contains(type) || type.IsEnum;
-    }
+    private bool IsFinalType(Type type) => finalTypes.Contains(type) || type.IsEnum;
 
     private string GetPropertyName<TProp>(
         Expression<Func<TOwner, TProp>> propertySelector)
@@ -262,25 +314,41 @@ public class PrintingConfig<TOwner>
                 throw new ArgumentException("Expression must be a property or field selector");
         }
     }
-
-    internal void AddTypeSerializer<TType>(Func<TType, string> serializeFunc)
+    
+    internal PrintingConfig<TOwner> AddTypeSerializer<TType>(Func<TType, string> serializeFunc)
     {
-        typeSerializers[typeof(TType)] = serializeFunc;
+        var newTypeSerializers = new Dictionary<Type, Delegate>(typeSerializers)
+        {
+            [typeof(TType)] = serializeFunc
+        };
+        return PrintingConfigWith(typeSerializers: newTypeSerializers);
     }
 
-    internal void AddTypeCulture<TType>(CultureInfo cultureInfo)
+    internal PrintingConfig<TOwner> AddTypeCulture<TType>(CultureInfo cultureInfo)
     {
-        typeCultures[typeof(TType)] = cultureInfo;
+        var newTypeCultures = new Dictionary<Type, CultureInfo>(typeCultures)
+        {
+            [typeof(TType)] = cultureInfo
+        };
+        return PrintingConfigWith(typeCultures: newTypeCultures);
     }
 
-    internal void AddPropertySerializer<TProp>(string propertyName,
+    internal PrintingConfig<TOwner> AddPropertySerializer<TProp>(string propertyName,
         Func<TProp, string> serializer)
     {
-        propertySerializers[propertyName] = serializer;
+        var newPropertySerializers = new Dictionary<string, Delegate>(propertySerializers)
+        {
+            [propertyName] = serializer
+        };
+        return PrintingConfigWith(propertySerializers: newPropertySerializers);
     }
 
-    internal void AddPropertyTrim(string propertyName, int maxLength)
+    internal PrintingConfig<TOwner> AddPropertyTrim(string propertyName, int maxLength)
     {
-        propertyTrimLengths[propertyName] = maxLength;
+        var newPropertyTrimLengths = new Dictionary<string, int>(propertyTrimLengths)
+        {
+            [propertyName] = maxLength
+        };
+        return PrintingConfigWith(propertyTrimLengths: newPropertyTrimLengths);
     }
 }

@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace ObjectPrinting.Tests;
 
 [TestFixture]
-public class ObjectPrinterConfigurationSerializationTests : TestBase
+public class ConfigurationSerializationTests : TestBase
 {
     [Test]
     public void PrintToString_WithExcludeType_ExcludesPropertiesOfType()
@@ -149,4 +149,36 @@ public class ObjectPrinterConfigurationSerializationTests : TestBase
         config.Should().BeOfType<PrintingConfig<Person>>();
     }
     
+    [Test]
+    public void PrintToString_WithConfigAndNestingLevel_AppliesBoth()
+    {
+        var nestedObject = new NestedContainer
+        {
+            Value = "Level 1",
+            Child = new NestedContainer
+            {
+                Value = "Very Long Value That Should Be Trimmed",
+                Child = new NestedContainer { Value = "Level 3" }
+            }
+        };
+
+        var result = nestedObject.PrintToString(
+            configurator => configurator
+                .SerializeProperty(x => x.Value).TrimTo(10),
+            nestingLevel: 2
+        );
+        
+        result.Should().Contain("Value = Level 1");
+        result.Should().Contain("Value = Very Long");
+        result.Should().NotContain("Level 3");
+    }
+    
+    [Test]
+    public void PrintingConfig_ShouldReturnNewInstance_AfterConfiguration()
+    {
+        var printer = ObjectPrinter.For<Person>().ExcludeType<Guid>();
+        var printer2 = printer.ExcludeType<int>();
+        
+        printer.Should().NotBeSameAs(printer2);
+    }
 }

@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace ObjectPrinting.Tests;
 
 [TestFixture]
-public class ObjectPrinterStandartSerializationTests : TestBase
+public class StandartSerializationTests : TestBase
 {
     [Test]
     public void PrintToString_SimpleObject_ReturnsCorrectFormat()
@@ -31,7 +31,15 @@ public class ObjectPrinterStandartSerializationTests : TestBase
     [Test]
     public void PrintToString_WithInheritance_IncludesAllProperties()
     {
-        var result = TestEmployee.PrintToString();
+        var testEmployee = new Employee
+        {
+            Name = "Jane",
+            Age = 25,
+            Position = "Developer",
+            Salary = 50000.50m
+        };
+        
+        var result = testEmployee.PrintToString();
 
         result.Should()
             .Contain("Employee")
@@ -80,7 +88,13 @@ public class ObjectPrinterStandartSerializationTests : TestBase
     [Test]
     public void PrintToString_WithNestedObjects_SerializesRecursively()
     {
-        var result = TestCompany.PrintToString();
+        var testCompany = new Company
+        {
+            Name = "Test Corp",
+            CEO = new Employee { Name = "CEO", Age = 45 }
+        };
+        
+        var result = testCompany.PrintToString();
 
         result.Should()
             .Contain("Company")
@@ -114,5 +128,30 @@ public class ObjectPrinterStandartSerializationTests : TestBase
     {
         var result = new object().PrintToString();
         result.Should().Contain("Object");
+    }
+    
+    [Test]
+    public void PrintToString_WithNestingLevelLimit_StopsAtSpecifiedDepth()
+    {
+        var nestedObject = new NestedContainer
+        {
+            Value = "Level 1",
+            Child = new NestedContainer
+            {
+                Value = "Level 2", 
+                Child = new NestedContainer
+                {
+                    Value = "Level 3",
+                    Child = new NestedContainer { Value = "Level 4" }
+                }
+            }
+        };
+        
+        var result = nestedObject.PrintToString(2);
+
+        result.Should().Contain("Level 1");
+        result.Should().Contain("Level 2"); 
+        result.Should().NotContain("Level 3");
+        result.Should().NotContain("Level 4");
     }
 }

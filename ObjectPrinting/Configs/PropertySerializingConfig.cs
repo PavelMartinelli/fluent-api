@@ -15,7 +15,6 @@ public class PropertySerializingConfig<TOwner, TProp>
 
     public PrintingConfig<TOwner> Use(Func<TProp, string> serializer)
     {
-        printingConfig.AddPropertySerializer(propertyName, serializer);
-        return printingConfig;
+        return printingConfig.AddPropertySerializer(propertyName, serializer);
     }
 }

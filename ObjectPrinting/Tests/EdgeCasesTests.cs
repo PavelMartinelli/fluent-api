@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace ObjectPrinting.Tests;
 
 [TestFixture]
-public class ObjectPrinterEdgeCasesTests : TestBase
+public class EdgeCasesTests : TestBase
 {
     [Test]
     public void PrintToString_WithCyclicReference_HandlesCyclicReference()
@@ -76,5 +76,16 @@ public class ObjectPrinterEdgeCasesTests : TestBase
 
         var result = selfReferencing.PrintToString();
         result.Should().Contain("Cyclic reference detected");
+    }
+    
+    [Test]
+    public void PrintToString_WithNegativeNestingLevel_ThrowsArgumentException()
+    {
+        var person = new Person { Name = "Test" };
+    
+        Action action = () => person.PrintToString(nestingLevel: -1);
+    
+        action.Should().Throw<ArgumentException>()
+            .WithMessage("Nesting level cannot be negative*");
     }
 }

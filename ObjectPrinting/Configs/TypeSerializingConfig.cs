@@ -14,13 +14,11 @@ public class TypeSerializingConfig<TOwner, TType>
     
     public PrintingConfig<TOwner> Use(Func<TType, string> serializeFunc)
     {
-        printingConfig.AddTypeSerializer(serializeFunc);
-        return printingConfig;
+        return printingConfig.AddTypeSerializer(serializeFunc);
     }
 
     public PrintingConfig<TOwner> Use(CultureInfo cultureInfo)
     {
-        printingConfig.AddTypeCulture<TType>(cultureInfo);
-        return printingConfig;
+        return printingConfig.AddTypeCulture<TType>(cultureInfo);
     }
 }

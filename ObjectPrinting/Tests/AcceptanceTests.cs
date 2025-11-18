@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace ObjectPrinting.Tests
 {
     [TestFixture]
-    public class ObjectPrinterAcceptanceTests
+    public class AcceptanceTests
     {
         [Test]
         public void Demo()

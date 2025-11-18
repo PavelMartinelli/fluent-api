@@ -14,15 +14,3 @@ public class Person
     public Person Parent { get; set; }
     public List<Person> Children { get; set; } = [];
 }
-
-public class Employee : Person
-{
-    public string Position { get; set; }
-    public decimal Salary { get; set; }
-}
-
-public class Company
-{
-    public string Name { get; set; }
-    public Employee CEO { get; set; }
-}
