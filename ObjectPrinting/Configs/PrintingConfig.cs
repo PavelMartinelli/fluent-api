@@ -14,7 +14,6 @@ public class PrintingConfig<TOwner>
     private readonly Dictionary<Type, Delegate> typeSerializers;
     private readonly Dictionary<Type, CultureInfo> typeCultures;
     private readonly Dictionary<string, Delegate> propertySerializers;
-    private readonly Dictionary<string, int> propertyTrimLengths;
     private readonly HashSet<string> excludedProperties;
     private readonly HashSet<Type> excludedTypes;
     private readonly HashSet<object> visitedObjects = [];
@@ -35,7 +34,6 @@ public class PrintingConfig<TOwner>
         typeSerializers = new Dictionary<Type, Delegate>();
         typeCultures = new Dictionary<Type, CultureInfo>();
         propertySerializers = new Dictionary<string, Delegate>();
-        propertyTrimLengths = new Dictionary<string, int>();
         excludedProperties = [];
         excludedTypes = [];
         nestingLevel = 50;
@@ -45,7 +43,6 @@ public class PrintingConfig<TOwner>
         Dictionary<Type, Delegate> typeSerializers,
         Dictionary<Type, CultureInfo> typeCultures,
         Dictionary<string, Delegate> propertySerializers,
-        Dictionary<string, int> propertyTrimLengths,
         HashSet<string> excludedProperties,
         HashSet<Type> excludedTypes,
         int maxNestingLevel)
@@ -53,7 +50,6 @@ public class PrintingConfig<TOwner>
         this.typeSerializers = new Dictionary<Type, Delegate>(typeSerializers);
         this.typeCultures = new Dictionary<Type, CultureInfo>(typeCultures);
         this.propertySerializers = new Dictionary<string, Delegate>(propertySerializers);
-        this.propertyTrimLengths = new Dictionary<string, int>(propertyTrimLengths);
         this.excludedProperties = new HashSet<string>(excludedProperties);
         this.excludedTypes = new HashSet<Type>(excludedTypes);
         this.nestingLevel = maxNestingLevel;
@@ -63,7 +59,6 @@ public class PrintingConfig<TOwner>
         Dictionary<Type, Delegate> typeSerializers = null,
         Dictionary<Type, CultureInfo> typeCultures = null,
         Dictionary<string, Delegate> propertySerializers = null,
-        Dictionary<string, int> propertyTrimLengths = null,
         HashSet<string> excludedProperties = null,
         HashSet<Type> excludedTypes = null,
         int? maxNestingLevel = null)
@@ -72,7 +67,6 @@ public class PrintingConfig<TOwner>
             typeSerializers ?? this.typeSerializers,
             typeCultures ?? this.typeCultures,
             propertySerializers ?? this.propertySerializers,
-            propertyTrimLengths ?? this.propertyTrimLengths,
             excludedProperties ?? this.excludedProperties,
             excludedTypes ?? this.excludedTypes,
             maxNestingLevel ?? this.nestingLevel);
@@ -235,7 +229,7 @@ public class PrintingConfig<TOwner>
             try
             {
                 var result = propertySerializer.DynamicInvoke(value);
-                return ProcessStringResult(result, memberName);
+                return result?.ToString() + Environment.NewLine;
             }
             catch
             {
@@ -243,19 +237,12 @@ public class PrintingConfig<TOwner>
             }
         }
 
-        if (memberName != null && propertyTrimLengths.TryGetValue(memberName, out var trimLength) && value is string str)
-        {
-            return (str.Length <= trimLength
-                ? str
-                : str.Substring(0, trimLength)) + Environment.NewLine;
-        }
-
         if (typeSerializers.TryGetValue(valueType, out var typeSerializer))
         {
             try
             {
                 var result = typeSerializer.DynamicInvoke(value);
-                return ProcessStringResult(result, memberName);
+                return result?.ToString() + Environment.NewLine;
             }
             catch
             {
@@ -275,23 +262,6 @@ public class PrintingConfig<TOwner>
             return formattableDefault.ToString(null, CultureInfo.InvariantCulture) + Environment.NewLine;
 
         return value.ToString() + Environment.NewLine;
-    }
-
-    private string ProcessStringResult(object result, string memberName)
-    {
-        if (result == null)
-            return "null" + Environment.NewLine;
-
-        var resultString = result.ToString();
-
-        if (memberName != null && propertyTrimLengths.TryGetValue(memberName, out var trimLength))
-        {
-            resultString = resultString.Length <= trimLength
-                ? resultString
-                : resultString.Substring(0, trimLength);
-        }
-
-        return resultString + Environment.NewLine;
     }
 
     private bool ShouldExcludeMember(Type memberType, string memberName)
@@ -341,14 +311,5 @@ public class PrintingConfig<TOwner>
             [propertyName] = serializer
         };
         return PrintingConfigWith(propertySerializers: newPropertySerializers);
-    }
-
-    internal PrintingConfig<TOwner> AddPropertyTrim(string propertyName, int maxLength)
-    {
-        var newPropertyTrimLengths = new Dictionary<string, int>(propertyTrimLengths)
-        {
-            [propertyName] = maxLength
-        };
-        return PrintingConfigWith(propertyTrimLengths: newPropertyTrimLengths);
     }
 }
